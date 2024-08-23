@@ -1,5 +1,5 @@
 use {
-    crate::{size_hint, Arbitrary, Result, Unstructured},
+    crate::{size_hint, Arbitrary, ArbitraryInRange, Result, Unstructured},
     core::{
         array,
         mem::{self, MaybeUninit},
@@ -45,28 +45,53 @@ where
     }
 }
 
+impl<'a, T, const N: usize> ArbitraryInRange<'a> for [T; N]
+where
+    T: ArbitraryInRange<'a>,
+{
+    type Bound = T::Bound;
+
+    #[inline]
+    fn arbitrary_in_range<R>(u: &mut Unstructured<'a>, range: &R) -> Result<Self>
+    where
+        R: std::ops::RangeBounds<Self::Bound>,
+    {
+        try_create_array(|_| T::arbitrary_in_range(u, range))
+    }
+
+    #[inline]
+    fn arbitrary_in_range_take_rest<R>(mut u: Unstructured<'a>, range: &R) -> Result<Self>
+    where
+        R: std::ops::RangeBounds<Self::Bound>,
+    {
+        let mut array = Self::arbitrary_in_range(&mut u, range)?;
+        if let Some(last) = array.last_mut() {
+            *last = T::arbitrary_in_range_take_rest(u, range)?;
+        }
+        Ok(array)
+    }
+}
+
 impl<'a, T, const N: usize> Arbitrary<'a> for [T; N]
 where
     T: Arbitrary<'a>,
 {
     #[inline]
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        try_create_array(|_| <T as Arbitrary<'a>>::arbitrary(u))
+        try_create_array(|_| T::arbitrary(u))
     }
 
     #[inline]
     fn arbitrary_take_rest(mut u: Unstructured<'a>) -> Result<Self> {
         let mut array = Self::arbitrary(&mut u)?;
         if let Some(last) = array.last_mut() {
-            *last = Arbitrary::arbitrary_take_rest(u)?;
+            *last = T::arbitrary_take_rest(u)?;
         }
         Ok(array)
     }
 
     #[inline]
     fn size_hint(d: usize) -> (usize, Option<usize>) {
-        size_hint::and_all(&array::from_fn::<_, N, _>(|_| {
-            <T as Arbitrary>::size_hint(d)
-        }))
+        size_hint::and_all(&array::from_fn::<_, N, _>(|_| T::size_hint(d)))
     }
 }
