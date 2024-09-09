@@ -1,5 +1,5 @@
 use {
-    super::{Arbitrary, Result, Unstructured},
+    super::{Arbitrary, Result, Unstructured, ArbitraryInRange},
     std::{collections::HashSet, fmt::Debug, hash::Hash, rc::Rc, sync::Arc},
 };
 
@@ -118,9 +118,11 @@ fn finite_buffer_fill_buffer() {
 
 #[test]
 fn arbitrary_for_integers() {
-    let x = [1, 2, 3, 4];
+    let x = [1, 2, 3];
     let mut buf = Unstructured::new(&x);
     let expected = 1 | (2 << 8) | (3 << 16) | (4 << 24);
+    println!("{:?}", expected);
+
     let actual = checked_arbitrary::<i32>(&mut buf).unwrap();
     assert_eq!(expected, actual);
 
@@ -133,6 +135,19 @@ fn arbitrary_for_integers() {
         i32::from_ne_bytes([1, 1, 1, 1]),
         i32::from_ne_bytes([0xff, 0xff, 0xff, 0xff]),
     ]);
+}
+
+#[test]
+fn arbitrary_in_range_for_integers() {
+    let x = [1, 2, 3, 4];
+    let mut u = Unstructured::new(&x);
+    let result_one = i32::arbitrary_in_range(&mut u, &(0..=10));
+
+    let y = [1, 2, 3];
+    let mut u = Unstructured::new(&y);
+    let result_two = i32::arbitrary_in_range(&mut u, &(0..=10));
+
+    assert_ne!(result_one, result_two);
 }
 
 #[test]
